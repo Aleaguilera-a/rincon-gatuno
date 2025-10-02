@@ -48,13 +48,15 @@ function iniciarJuego() {
       gato.saltando = true;
       sonidoSalto.play();
     }
-    document.addEventListener("touchstart", () => {
+  });
+
+  document.addEventListener("touchstart", () => {
   if (!gato.saltando) {
     gato.vy = fuerzaSalto;
     gato.saltando = true;
     sonidoSalto.play();
   }
-  });
+});
 
   musicaFondo.play();
   juegoInterval = setInterval(actualizarJuego, 20);
@@ -153,4 +155,5 @@ function victoria() {
 function redireccion() {
   window.location.href = "https://form.jotform.com/252738529148063";
 }
+
 
