@@ -1,137 +1,181 @@
-let canvas, ctx;
-let gato, obstaculos = [];
-let puntaje = 0;
-let juegoInterval;
-let gatoSeleccionado = "";
-const puntajeMax = 20; // Cambia según quieras
-const velocidad = 5;
+// ==== CONFIGURACIONES ====
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-// Sonidos
-const sonidoSalto = new Audio('sonidos/maullido.mp3'); // tu archivo de maullido
-const musicaFondo = new Audio('sonidos/musica.mp3');  // tu canción de fondo
-musicaFondo.loop = true;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-// Selección de gato
-function seleccionarGato(nombre) {
-  gatoSeleccionado = nombre;
-  document.getElementById("btn-iniciar").disabled = false;
-  document.querySelectorAll(".seleccion-gato img").forEach(img => img.style.borderColor = "transparent");
-  event.target.style.borderColor = "#ff6600";
+let gameOverFlag = false;
+let score = 0;
+let highScore = 20; // Puntaje objetivo para "felicidades"
+let obstacles = [];
+let gravity = 0.7;
+let jumpPower = -15;
+let groundHeight = 100; // altura del suelo
+
+// ==== SONIDOS ====
+let jumpSound = new Audio("sonidos/maullido.mp3");
+let bgMusic = new Audio("sonidos/musica.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.3;
+bgMusic.play();
+
+// ==== JUGADOR ====
+let catImg = new Image();
+catImg.src = "gatos/gato1.png"; // por defecto, se puede cambiar según selección
+
+let cat = {
+  x: 50,
+  y: canvas.height - groundHeight - 100, // bien pegado al suelo
+  width: 80,
+  height: 80,
+  dy: 0,
+  jumping: false,
+};
+
+// ==== OBSTÁCULOS ====
+let obstacleImg = new Image();
+obstacleImg.src = "obstaculo.png";
+
+class Obstacle {
+  constructor() {
+    this.width = 50 + Math.random() * 30;
+    this.height = 50 + Math.random() * 20;
+    this.x = canvas.width;
+    this.y = canvas.height - groundHeight - this.height;
+    this.speed = 7;
+  }
+
+  draw() {
+    ctx.drawImage(obstacleImg, this.x, this.y, this.width, this.height);
+  }
+
+  update() {
+    this.x -= this.speed;
+    this.draw();
+  }
 }
 
-// Iniciar juego
-function iniciarJuego() {
-  document.getElementById("pantalla-seleccion").style.display = "none";
-  document.getElementById("pantalla-juego").style.display = "block";
+// ==== CONTROL ====
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" || e.code === "ArrowUp") {
+    jump();
+  }
+});
 
-  canvas = document.getElementById("gameCanvas");
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  ctx = canvas.getContext("2d");
+canvas.addEventListener("touchstart", jump);
 
-  gato = {
-    x: 50,
-    y: canvas.height - 150,
-    width: 80,
-    height: 80,
-    vy: 0,
-    saltando: false,
-    img: new Image()
-  };
-  gato.img.src = `gatos/${gatoSeleccionado}.png`;
+function jump() {
+  if (!cat.jumping) {
+    cat.dy = jumpPower;
+    cat.jumping = true;
+    jumpSound.currentTime = 0;
+    jumpSound.play();
+  }
+}
 
-  document.addEventListener("keydown", (e) => {
-    if(e.code === "Space" && !gato.saltando) {
-      gato.vy = -15;
-      gato.saltando = true;
-      sonidoSalto.play();
+// ==== GAME LOOP ====
+let lastObstacleTime = Date.now();
+
+function drawCat() {
+  ctx.drawImage(catImg, cat.x, cat.y, cat.width, cat.height);
+}
+
+function updateCat() {
+  cat.y += cat.dy;
+  cat.dy += gravity;
+
+  // suelo
+  if (cat.y + cat.height >= canvas.height - groundHeight) {
+    cat.y = canvas.height - groundHeight - cat.height;
+    cat.dy = 0;
+    cat.jumping = false;
+  }
+  drawCat();
+}
+
+function detectCollision(obstacle) {
+  // "hitbox" más justa (márgenes para no chocar en el aire)
+  if (
+    cat.x + 15 < obstacle.x + obstacle.width - 15 &&
+    cat.x + cat.width - 15 > obstacle.x + 15 &&
+    cat.y + 10 < obstacle.y + obstacle.height &&
+    cat.y + cat.height - 5 > obstacle.y
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function gameOver() {
+  gameOverFlag = true;
+  ctx.fillStyle = "black";
+  ctx.font = "40px Arial";
+  ctx.fillText("Game Over 😿", canvas.width / 2 - 120, canvas.height / 2);
+
+  if (score >= highScore) {
+    ctx.fillText("¡Felicidades! 🎉", canvas.width / 2 - 130, canvas.height / 2 + 60);
+
+    // Botón para redirigir
+    let btn = document.createElement("button");
+    btn.innerText = "Ir a la sorpresa";
+    btn.style.position = "absolute";
+    btn.style.left = "50%";
+    btn.style.top = "60%";
+    btn.style.transform = "translate(-50%, -50%)";
+    btn.style.padding = "15px 30px";
+    btn.style.fontSize = "20px";
+    btn.style.background = "#ff9800";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.borderRadius = "10px";
+    btn.style.cursor = "pointer";
+    document.body.appendChild(btn);
+
+    btn.addEventListener("click", () => {
+      window.location.href = "https://tu-url-aqui.com"; // cambia por tu URL
+    });
+  }
+}
+
+function animate() {
+  if (gameOverFlag) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // suelo
+  ctx.fillStyle = "#87ceeb";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#654321";
+  ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+
+  updateCat();
+
+  // Obstáculos
+  if (Date.now() - lastObstacleTime > 2500) { // más espaciados (2.5 seg)
+    obstacles.push(new Obstacle());
+    lastObstacleTime = Date.now();
+  }
+
+  obstacles.forEach((obstacle, index) => {
+    obstacle.update();
+
+    if (obstacle.x + obstacle.width < 0) {
+      obstacles.splice(index, 1);
+      score++;
+    }
+
+    if (detectCollision(obstacle)) {
+      gameOver();
     }
   });
 
-  musicaFondo.play();
-  juegoInterval = setInterval(actualizarJuego, 20);
+  // Score
+  ctx.fillStyle = "black";
+  ctx.font = "20px Arial";
+  ctx.fillText("Puntaje: " + score, 20, 30);
+
+  requestAnimationFrame(animate);
 }
 
-// Obstáculo
-function generarObstaculo() {
-  const obs = {
-    x: canvas.width,
-    y: canvas.height - 100,
-    width: 50,
-    height: 50,
-    img: new Image()
-  };
-  obs.img.src = 'obstaculo.png';
-  obstaculos.push(obs);
-}
-
-// Actualizar juego
-function actualizarJuego() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Fondo genérico
-  ctx.fillStyle = "#cceeff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Suelo
-  ctx.fillStyle = "#88cc88";
-  ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-
-  // Movimiento del gato
-  gato.vy += 0.8; // gravedad
-  gato.y += gato.vy;
-  if(gato.y >= canvas.height - 150) {
-    gato.y = canvas.height - 150;
-    gato.vy = 0;
-    gato.saltando = false;
-  }
-  ctx.drawImage(gato.img, gato.x, gato.y, gato.width, gato.height);
-
-  // Obstáculos
-  if(Math.random() < 0.02) generarObstaculo();
-  for(let i=0; i<obstaculos.length; i++) {
-    obstaculos[i].x -= velocidad;
-    ctx.drawImage(obstaculos[i].img, obstaculos[i].x, obstaculos[i].y, obstaculos[i].width, obstaculos[i].height);
-
-    // Colisión
-    if(gato.x < obstaculos[i].x + obstaculos[i].width &&
-       gato.x + gato.width > obstaculos[i].x &&
-       gato.y < obstaculos[i].y + obstaculos[i].height &&
-       gato.y + gato.height > obstaculos[i].y) {
-        finJuego();
-    }
-
-    // Puntaje
-    if(!obstaculos[i].pasado && obstaculos[i].x + obstaculos[i].width < gato.x) {
-      puntaje++;
-      obstaculos[i].pasado = true;
-      document.getElementById("puntaje").innerText = `Puntaje: ${puntaje}`;
-      if(puntaje >= puntajeMax) {
-        victoria();
-      }
-    }
-  }
-}
-
-// Fin de juego
-function finJuego() {
-  clearInterval(juegoInterval);
-  musicaFondo.pause();
-  musicaFondo.currentTime = 0;
-  alert("¡Game Over! Puntaje: " + puntaje);
-  location.reload();
-}
-
-// Victoria
-function victoria() {
-  clearInterval(juegoInterval);
-  musicaFondo.pause();
-  musicaFondo.currentTime = 0;
-  document.getElementById("pantalla-juego").style.display = "none";
-  document.getElementById("pantalla-victoria").style.display = "flex";
-}
-
-// Redirección
-function redireccion() {
-  window.location.href = "https://form.jotform.com/252738529148063"; // Cambia la URL
-}
+animate();
